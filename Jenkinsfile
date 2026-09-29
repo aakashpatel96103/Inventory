@@ -70,6 +70,7 @@ pipeline {
             steps {
                 bat '''
                     set JENKINS_NODE_COOKIE=dontKillMe
+                    taskkill /F /IM kubectl.exe 2>NUL || ver >NUL
                     start /B kubectl port-forward service/prometheus 1000:1000 -n %MON%
                     start /B kubectl port-forward service/inventory-service 2001:2001 -n %NS%
                     start /B kubectl port-forward service/grafana 2002:2002 -n %MON%

@@ -9,8 +9,5 @@ spec:
   ports:
     - name: http
       port: 2001
-      targetPort: 8000
-    - name: internal
-      port: 8000
-      targetPort: 8000
+      targetPort: 2001
   type: ClusterIP
