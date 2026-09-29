@@ -11,21 +11,12 @@ pipeline {
     }
 
     stages {
-        stage('Git Workflow') {
-            steps {
-                bat 'git status --short'
-            }
-        }
-
-        stage('Build Automation') {
-            steps {
-                bat 'python -m pip install -r inventory-service/requirements.txt'
-            }
-        }
-
         stage('Automated Testing') {
             steps {
-                bat 'set PYTHONPATH=inventory-service&& python -m pytest inventory-service/tests -v'
+                bat '''
+                    python -m pip install -q -r inventory-service/requirements.txt
+                    set PYTHONPATH=inventory-service&& python -m pytest inventory-service/tests -v
+                '''
             }
         }
 
@@ -44,23 +35,8 @@ pipeline {
         stage('Container Registry') {
             steps {
                 bat '''
-                    docker rm -f inventory-registry 2>NUL || ver >NUL
-                    docker run -d -p 2000:5000 --restart unless-stopped --name inventory-registry registry:2
-                    timeout /t 5 /nobreak >NUL
+                    docker inspect inventory-registry >NUL 2>&1 || docker run -d -p 2000:5000 --restart unless-stopped --name inventory-registry registry:2
                     docker push %REGISTRY_IMAGE%
-                '''
-            }
-        }
-
-        stage('Prepare Kubernetes') {
-            steps {
-                bat '''
-                    kubectl apply -f kubernetes/namespace.yaml
-                    kubectl apply -f kubernetes/monitoring/namespace.yaml
-                    kubectl apply -f kubernetes/inventory-service-configmap.yaml
-                    kubectl apply -f kubernetes/inventory-service-secret.yaml
-                    kubectl apply -f kubernetes/monitoring/prometheus.yaml
-                    kubectl apply -f kubernetes/monitoring/grafana.yaml
                 '''
             }
         }
@@ -71,6 +47,7 @@ pipeline {
                     docker save -o k8s.tar %IMAGE%
                     docker cp k8s.tar desktop-control-plane:/k8s.tar
                     docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
+                    docker exec desktop-control-plane rm -f /k8s.tar
                     del /f /q k8s.tar
                 '''
             }
@@ -81,25 +58,16 @@ pipeline {
                 script {
                     try {
                         bat '''
-                            kubectl apply -f kubernetes/inventory-service-deployment.yaml
-                            kubectl apply -f kubernetes/inventory-service.yaml
+                            kubectl apply -f kubernetes -R
                             kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
+                            kubectl get pods -n %NS%
+                            kubectl logs deployment/%APP% -n %NS% --tail=20
                         '''
                     } catch (Exception e) {
                         bat 'kubectl rollout undo deployment/%APP% -n %NS%'
                         throw e
                     }
                 }
-            }
-        }
-
-        stage('Health & Metrics Validation') {
-            steps {
-                bat '''
-                    kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
-                    kubectl get pods -n %NS%
-                    kubectl logs deployment/%APP% -n %NS% --tail=20
-                '''
             }
         }
 
