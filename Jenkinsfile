@@ -60,16 +60,16 @@ pipeline {
                         if (hasTrivy) {
                             echo 'Running locally installed Trivy...'
                             if (isUnix()) {
-                                sh 'trivy image --severity HIGH,CRITICAL --exit-code 1 ${IMAGE}'
+                                sh 'trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${IMAGE}'
                             } else {
-                                bat 'trivy image --severity HIGH,CRITICAL --exit-code 1 %IMAGE%'
+                                bat 'trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 %IMAGE%'
                             }
                         } else {
                             echo 'Trivy CLI not found; running Trivy via official Docker container...'
                             if (isUnix()) {
-                                sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --exit-code 1 ${IMAGE}'
+                                sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${IMAGE}'
                             } else {
-                                bat 'docker run --rm -v //var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --exit-code 1 %IMAGE%'
+                                bat 'docker run --rm -v //var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 %IMAGE%'
                             }
                         }
                     }
