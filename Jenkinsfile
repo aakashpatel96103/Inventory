@@ -11,12 +11,15 @@ pipeline {
     }
 
     stages {
+        stage('Build Automation') {
+            steps {
+                bat 'python -m pip install -r inventory-service/requirements.txt'
+            }
+        }
+
         stage('Automated Testing') {
             steps {
-                bat '''
-                    python -m pip install -q -r inventory-service/requirements.txt
-                    set PYTHONPATH=inventory-service&& python -m pytest inventory-service/tests -v
-                '''
+                bat 'python -m pytest inventory-service/tests -v'
             }
         }
 
@@ -28,25 +31,15 @@ pipeline {
 
         stage('Security Scan - Trivy') {
             steps {
-                script {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        bat '''
-                            where trivy >nul 2>&1
-                            if not errorlevel 1 (
-                                trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 %IMAGE%
-                            ) else (
-                                docker run --rm -v //var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 %IMAGE%
-                            )
-                        '''
-                    }
-                }
+                bat 'trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 %IMAGE%'
             }
         }
 
         stage('Container Registry') {
             steps {
                 bat '''
-                    docker inspect inventory-registry >NUL 2>&1 || docker run -d -p 2000:5000 --restart unless-stopped --name inventory-registry registry:2
+                    docker rm -f inventory-registry 2>NUL || ver >NUL
+                    docker run -d -p 2000:5000 --restart unless-stopped --name inventory-registry registry:2
                     docker push %REGISTRY_IMAGE%
                 '''
             }
@@ -54,57 +47,32 @@ pipeline {
 
         stage('Load Image to Kubernetes') {
             steps {
-                script {
-                    def k8sContext = bat(returnStdout: true, script: '@kubectl config current-context 2>NUL || echo unknown').trim().toLowerCase()
-                    echo "Kubernetes context: ${k8sContext}"
-
-                    if (k8sContext.contains('minikube')) {
-                        bat 'minikube image load %IMAGE%'
-                    } else if (k8sContext.contains('kind')) {
-                        bat 'kind load docker-image %IMAGE%'
-                    } else {
-                        bat '''
-                            docker inspect desktop-control-plane >NUL 2>&1
-                            if not errorlevel 1 (
-                                docker save -o k8s.tar %IMAGE%
-                                docker cp k8s.tar desktop-control-plane:/k8s.tar
-                                docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
-                                docker exec desktop-control-plane rm -f /k8s.tar
-                                del /f /q k8s.tar
-                            )
-                        '''
-                    }
-                }
+                bat '''
+                    docker save -o k8s.tar %IMAGE%
+                    docker cp k8s.tar desktop-control-plane:/k8s.tar
+                    docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
+                    del /f /q k8s.tar
+                '''
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                    try {
-                        bat '''
-                            kubectl apply -f kubernetes -R
-                            kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
-                            kubectl get pods -n %NS%
-                            kubectl logs deployment/%APP% -n %NS% --tail=20
-                        '''
-                    } catch (Exception e) {
-                        bat 'kubectl rollout undo deployment/%APP% -n %NS%'
-                        throw e
-                    }
-                }
+                bat '''
+                    kubectl apply -f kubernetes -R
+                    kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
+                    kubectl get pods -n %NS%
+                '''
             }
         }
 
         stage('Start Services') {
             steps {
                 bat '''
-                    taskkill /F /IM kubectl.exe 2>nul || ver >nul
                     set JENKINS_NODE_COOKIE=dontKillMe
-                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/prometheus 1000:1000 -n %MON% > prometheus-pf.log 2>&1"
-                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/inventory-service 2001:2001 -n %NS% > inventory-pf.log 2>&1"
-                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/grafana 2002:2002 -n %MON% > grafana-pf.log 2>&1"
-                    timeout /t 5 /nobreak >nul
+                    start /B kubectl port-forward service/prometheus 1000:1000 -n %MON%
+                    start /B kubectl port-forward service/inventory-service 2001:2001 -n %NS%
+                    start /B kubectl port-forward service/grafana 2002:2002 -n %MON%
                     exit /b 0
                 '''
             }
@@ -122,7 +90,7 @@ pipeline {
             echo '======================================================='
         }
         failure {
-            echo 'Pipeline failed. Kubernetes rollback is attempted when deployment rollout fails.'
+            echo 'Pipeline failed. Check stage logs for details.'
         }
     }
 }
