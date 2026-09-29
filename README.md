@@ -24,9 +24,11 @@ An Inventory Management System for managing products, stock and suppliers with a
 5. Docker images: versioned image `inventory-service:v1.0.0`.
 6. Container registry: local Docker Registry at `localhost:2000`.
 7. Kubernetes: namespace, deployment and ClusterIP service.
-8. Monitoring: Prometheus scrapes `/metrics`.
-9. Logging: Python application logs and Kubernetes pod logs are checked by Jenkins.
-10. Security scanning: Trivy scans the Docker image for HIGH and CRITICAL vulnerabilities.
+8. ConfigMap: non-sensitive application settings (`APP_NAME`, `APP_VERSION`, `LOG_LEVEL`).
+9. Secret: sensitive application key (`SECRET_KEY`).
+10. Monitoring: Prometheus scrapes `/metrics`.
+11. Logging: Python application logs and Kubernetes pod logs are checked by Jenkins.
+12. Security scanning: Trivy scans the Docker image for HIGH and CRITICAL vulnerabilities.
 
 ## URLs
 
@@ -47,7 +49,7 @@ Monitoring namespace: `monitoring`
 
 ## CI/CD Flow
 
-Git Workflow → Build → Test → Docker Build → Trivy Scan → Container Registry → Kubernetes Deployment → Health/Logs → Monitoring → Services
+Git Workflow → Build → Test → Docker Build → Trivy Scan → Container Registry → ConfigMap/Secret → Kubernetes Deployment → Health/Logs → Monitoring → Services
 
 ## Rollback
 

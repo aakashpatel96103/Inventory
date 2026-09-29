@@ -1,3 +1,4 @@
+import os
 import logging
 from itertools import count
 from typing import Dict, List
@@ -6,10 +7,15 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+APP_NAME = os.getenv("APP_NAME", "Inventory Management System")
+APP_VERSION = os.getenv("APP_VERSION", "v1.0.0")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+SECRET_KEY = os.getenv("SECRET_KEY", "inventory-super-secret-key")
+
+logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("inventory")
 
-app = FastAPI(title="Inventory Management System API", description="REST API for products, stock and suppliers with monitoring and logging.", version="1.0.0")
+app = FastAPI(title=APP_NAME, description="REST API for products, stock and suppliers with monitoring and logging.", version=APP_VERSION)
 Instrumentator().instrument(app).expose(app)
 
 products: Dict[int, dict] = {}
@@ -38,7 +44,7 @@ class StockUpdate(BaseModel):
 
 @app.get("/", tags=["System"])
 def root():
-    return {"message": "Inventory Management API is running", "version": "v1.0.0"}
+    return {"message": f"{APP_NAME} API is running", "version": APP_VERSION}
 
 @app.get("/health", tags=["System"])
 def health():
