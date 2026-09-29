@@ -24,11 +24,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 2001
-          envFrom:
-            - configMapRef:
-                name: inventory-config
-            - secretRef:
-                name: inventory-secret
           readinessProbe:
             httpGet:
               path: /health
