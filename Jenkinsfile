@@ -25,7 +25,7 @@ pipeline {
 
         stage('Automated Testing') {
             steps {
-                bat 'python -m pytest inventory-service/tests -v'
+                bat 'set PYTHONPATH=inventory-service&& python -m pytest inventory-service/tests -v'
             }
         }
 
@@ -44,8 +44,8 @@ pipeline {
         stage('Container Registry') {
             steps {
                 bat '''
-                    docker rm -f inventory-registry 2>NUL || exit /b 0
-                    docker run -d -p 5000:5000 --restart unless-stopped --name inventory-registry registry:2
+                    docker rm -f inventory-registry 2>NUL || ver >NUL
+                    docker run -d -p 2000:5000 --restart unless-stopped --name inventory-registry registry:2
                     timeout /t 5 /nobreak >NUL
                     docker push %REGISTRY_IMAGE%
                 '''
