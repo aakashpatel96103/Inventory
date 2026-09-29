@@ -48,10 +48,34 @@ pipeline {
         stage('Load Image to Kubernetes') {
             steps {
                 bat '''
-                    docker save -o k8s.tar %IMAGE%
-                    docker cp k8s.tar desktop-control-plane:/k8s.tar
-                    docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
-                    del /f /q k8s.tar
+                    docker inspect minikube >NUL 2>&1 && (
+                        echo Loading image into Minikube container...
+                        docker save -o k8s.tar %IMAGE%
+                        docker cp k8s.tar minikube:/k8s.tar
+                        docker exec minikube ctr -n k8s.io images import /k8s.tar
+                        docker exec minikube rm -f /k8s.tar
+                        del /f /q k8s.tar
+                        exit /b 0
+                    )
+
+                    docker inspect desktop-control-plane >NUL 2>&1 && (
+                        echo Loading image into desktop-control-plane...
+                        docker save -o k8s.tar %IMAGE%
+                        docker cp k8s.tar desktop-control-plane:/k8s.tar
+                        docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
+                        docker exec desktop-control-plane rm -f /k8s.tar
+                        del /f /q k8s.tar
+                        exit /b 0
+                    )
+
+                    where minikube >NUL 2>&1 && (
+                        echo Loading image via minikube CLI...
+                        minikube image load %IMAGE%
+                        exit /b 0
+                    )
+
+                    echo Using local image cache...
+                    exit /b 0
                 '''
             }
         }
@@ -59,6 +83,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 bat '''
+                    kubectl cluster-info >NUL 2>&1 || (where minikube >NUL 2>&1 && minikube start)
                     kubectl apply -f kubernetes -R
                     kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
                     kubectl get pods -n %NS%
