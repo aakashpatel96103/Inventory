@@ -99,11 +99,12 @@ pipeline {
         stage('Start Services') {
             steps {
                 bat '''
+                    taskkill /F /IM kubectl.exe 2>nul || ver >nul
                     set JENKINS_NODE_COOKIE=dontKillMe
-                    powershell -NoProfile -Command "Get-Process -Id (Get-NetTCPConnection -LocalPort 1000,2001,2002 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; exit 0"
-                    start /B kubectl port-forward service/prometheus 1000:1000 -n %MON%
-                    start /B kubectl port-forward service/inventory-service 2001:2001 -n %NS%
-                    start /B kubectl port-forward service/grafana 2002:2002 -n %MON%
+                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/prometheus 1000:1000 -n %MON% > prometheus-pf.log 2>&1"
+                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/inventory-service 2001:2001 -n %NS% > inventory-pf.log 2>&1"
+                    start "" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe&& kubectl port-forward service/grafana 2002:2002 -n %MON% > grafana-pf.log 2>&1"
+                    timeout /t 5 /nobreak >nul
                     exit /b 0
                 '''
             }
