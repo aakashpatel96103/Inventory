@@ -144,7 +144,6 @@ pipeline {
                         where minikube >NUL 2>&1 && (
                             echo [K8s] Active cluster: Minikube
                             kubectl config use-context minikube >NUL 2>&1 || ver >NUL
-                            kubectl cluster-info >NUL 2>&1 || minikube start
                         )
                     )
 
