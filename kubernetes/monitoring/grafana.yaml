@@ -701,6 +701,8 @@ spec:
               value: "false"
             - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
               value: /var/lib/grafana/dashboards/inventory.json
+            - name: GF_PLUGINS_ALLOW_AUTOMATIC_UPDATE
+              value: "false"
           readinessProbe:
             httpGet:
               path: /api/health

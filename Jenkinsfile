@@ -48,18 +48,11 @@ pipeline {
         stage('Load Image to Kubernetes') {
             steps {
                 bat '''
-                    docker inspect minikube >NUL 2>&1 && (
-                        echo Loading image into Minikube container...
-                        docker save -o k8s.tar %IMAGE%
-                        docker cp k8s.tar minikube:/k8s.tar
-                        docker exec minikube ctr -n k8s.io images import /k8s.tar
-                        docker exec minikube rm -f /k8s.tar
-                        del /f /q k8s.tar
-                        exit /b 0
-                    )
+                    kubectl config get-contexts docker-desktop >NUL 2>&1 && kubectl config use-context docker-desktop >NUL 2>&1
 
                     docker inspect desktop-control-plane >NUL 2>&1 && (
                         echo Loading image into desktop-control-plane...
+                        del /f /q k8s.tar 2>NUL || ver >NUL
                         docker save -o k8s.tar %IMAGE%
                         docker cp k8s.tar desktop-control-plane:/k8s.tar
                         docker exec desktop-control-plane ctr -n k8s.io images import /k8s.tar
@@ -68,9 +61,20 @@ pipeline {
                         exit /b 0
                     )
 
-                    where minikube >NUL 2>&1 && (
+                    where minikube >NUL 2>&1 && minikube status >NUL 2>&1 && (
                         echo Loading image via minikube CLI...
                         minikube image load %IMAGE%
+                        exit /b 0
+                    )
+
+                    docker inspect minikube >NUL 2>&1 && (
+                        echo Loading image into Minikube container...
+                        del /f /q k8s.tar 2>NUL || ver >NUL
+                        docker save -o k8s.tar %IMAGE%
+                        docker cp k8s.tar minikube:/k8s.tar
+                        docker exec minikube ctr -n k8s.io images import /k8s.tar
+                        docker exec minikube rm -f /k8s.tar
+                        del /f /q k8s.tar
                         exit /b 0
                     )
 
@@ -83,7 +87,9 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 bat '''
-                    kubectl cluster-info >NUL 2>&1 || (where minikube >NUL 2>&1 && minikube start)
+                    kubectl config get-contexts docker-desktop >NUL 2>&1 && kubectl config use-context docker-desktop >NUL 2>&1
+                    kubectl apply -f kubernetes/namespace.yaml
+                    kubectl apply -f kubernetes/monitoring/namespace.yaml
                     kubectl apply -f kubernetes -R
                     kubectl rollout status deployment/%APP% -n %NS% --timeout=120s
                     kubectl get pods -n %NS%
